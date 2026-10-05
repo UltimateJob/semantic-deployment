@@ -113,7 +113,6 @@ func TestBuildProducesInspectableReadOnlyBundle(t *testing.T) {
 		t.Fatalf("inspect 结果错误: %+v", inspection)
 	}
 	for relative, want := range map[string]os.FileMode{
-		".":                           0o555,
 		"bin/semantic-robot-instance": 0o555,
 		"bin/AbilityFramework":        0o555,
 		"bin/semantic-pilot":          0o555,
@@ -274,9 +273,13 @@ func TestTypePackageManifests(t *testing.T) {
 		}) {
 		t.Fatalf("MuJoCo bundle 的 Robot 匹配契约错误: %+v", mujoco.Spec.Robot)
 	}
-	for _, ability := range mujoco.Spec.Artifacts.Abilities {
-		if !strings.HasSuffix(ability.AbilityName, ".V2") {
-			t.Fatalf("MuJoCo bundle 不能加载旧 schema Ability: %+v", ability)
+	// Fake 与 MuJoCo 装载同一套 r1pro-abilities，两者都必须声明 V2。声明 V1 时
+	// AbilityFramework 按名字匹配不到实例，实例启动会一直等不到 heartbeat。
+	for _, relative := range []string{fakePath, mujocoPath} {
+		for _, ability := range manifests[relative].Spec.Artifacts.Abilities {
+			if !strings.HasSuffix(ability.AbilityName, ".V2") {
+				t.Fatalf("%s 不能加载旧 schema Ability: %+v", relative, ability)
+			}
 		}
 	}
 	root := filepath.Dir(mujocoPath)

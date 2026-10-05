@@ -127,6 +127,8 @@ func BuildWithOptions(source, output string, mappings []FileMapping, options Bui
 	committed := false
 	defer func() {
 		if !committed {
+			// Darwin cannot remove a read-only directory; reopen the tree
+			// before discarding a partial build.
 			_ = filepath.WalkDir(temporary, func(path string, entry os.DirEntry, err error) error {
 				if err == nil && entry.IsDir() {
 					return os.Chmod(path, 0o755)
@@ -193,7 +195,8 @@ func BuildWithOptions(source, output string, mappings []FileMapping, options Bui
 	if err := os.Rename(temporary, outputAbs); err != nil {
 		return Bundle{}, err
 	}
-	// Darwin requires the moved directory to remain writable until rename.
+	// Darwin requires the moved directory to remain writable until rename;
+	// seal the copied-in-place bundle only after it has landed at output.
 	temporary = outputAbs
 	if err := os.Chmod(outputAbs, 0o555); err != nil {
 		return Bundle{}, err

@@ -62,6 +62,9 @@ func RunDebugStack(ctx context.Context, instanceDirectory string, readyOutput io
 	if err != nil {
 		return err
 	}
+	if err := applyComponentAbilities(config, &opened, instanceDirectory); err != nil {
+		return err
+	}
 	if err := opened.Manifest.Supports(config.Spec.Robot.Model,
 		config.Spec.Robot.Backend, config.Spec.Robot.BackendProfile); err != nil {
 		return err
@@ -119,7 +122,7 @@ func RunDebugStack(ctx context.Context, instanceDirectory string, readyOutput io
 		return err
 	}
 	for _, ability := range opened.Manifest.Spec.Artifacts.Abilities {
-		if err := client.EnsurePackage(ctx, ability.Template, opened.Path(ability.File), opened.Manifest.ReadinessTimeout()); err != nil {
+		if err := client.EnsurePackage(ctx, ability.Template, abilityPackagePath(opened, ability.File), opened.Manifest.ReadinessTimeout()); err != nil {
 			return fmt.Errorf("准备 Ability %s: %w", ability.Role, err)
 		}
 		instance, err := client.Activate(ctx, ability.Template, ability.AbilityName, opened.Manifest.ReadinessTimeout())

@@ -72,6 +72,12 @@ func startProcess(name, executable string, arguments []string, directory, logPat
 	command.Env = environment
 	command.Stdout = logFile
 	command.Stderr = logFile
+	// supervisor 必须独占终端的信号边界。否则用户在调试终端按 Ctrl-C 时，
+	// SIGINT 会同时到达 AbilityFramework、Pilot 和 supervisor，子进程会在
+	// Pilot 提交 hold 证据之前退出，彻底破坏固定的安全停止顺序。每个直接
+	// 受管进程使用独立进程组（Unix）或独立 Job Object（Windows）后，终端
+	// 信号只唤醒 supervisor；后续仍由这里按 Pilot → Ability →
+	// AbilityFramework 的顺序发送显式停止请求。
 	tree, err := processport.Start(command)
 	if err != nil {
 		logFile.Close()
@@ -82,7 +88,7 @@ func startProcess(name, executable string, arguments []string, directory, logPat
 		_ = tree.Kill()
 		_ = command.Wait()
 		_ = tree.Close()
-		_ = logFile.Close()
+		logFile.Close()
 		return nil, err
 	}
 	process := &managedProcess{name: name, cmd: command, done: make(chan error, 1), tree: tree, identity: identity}
@@ -98,9 +104,10 @@ func (process *managedProcess) terminate(timeout time.Duration, requireCleanExit
 	if process == nil || process.cmd.Process == nil {
 		return false, nil
 	}
-	// startProcess creates a dedicated process group. After the caller has
-	// completed Pilot hold and Ability stop, retire the whole owned group:
-	// macOS has no Linux PR_SET_PDEATHSIG to reap Ability Python children.
+	// startProcess creates a dedicated process group (Unix) or Job Object
+	// (Windows). After the caller has completed Pilot hold and Ability stop,
+	// retire the whole owned tree: macOS has no Linux PR_SET_PDEATHSIG to reap
+	// Ability Python children.
 	deadline := time.Now().Add(timeout)
 	if err := process.tree.Terminate(); err != nil {
 		return false, fmt.Errorf("终止 %s 进程组: %w", process.name, err)
@@ -205,6 +212,9 @@ func Run(ctx context.Context, instanceDirectory string) (runErr error) {
 	if err != nil {
 		return err
 	}
+	if err := applyComponentAbilities(config, &opened, instanceDirectory); err != nil {
+		return err
+	}
 	if err := opened.Manifest.Supports(config.Spec.Robot.Model,
 		config.Spec.Robot.Backend, config.Spec.Robot.BackendProfile); err != nil {
 		return err
@@ -283,15 +293,17 @@ func Run(ctx context.Context, instanceDirectory string) (runErr error) {
 		}
 		stopContext, cancel := context.WithTimeout(context.Background(), opened.Manifest.ShutdownTimeout())
 		defer cancel()
-		evidence.AbilityStopConfirmed, failures = abilityframework.StopAll(
-			stopContext, client, activated, opened.Manifest.ShutdownTimeout(),
-		)
-		if len(failures) > 0 {
-			// Keep the framework available for reconciliation when Ability stop
-			// has not been confirmed; group termination requires that evidence.
-			state.StopEvidence = &evidence
-			_ = writeState(instanceDirectory, &state)
-			return fmt.Errorf("%w: %s", errSafetyUnconfirmed, strings.Join(failures, "; "))
+		for index := len(activated) - 1; index >= 0; index-- {
+			identifier := activated[index]
+			if err := client.Stop(stopContext, identifier); err != nil {
+				failures = append(failures, fmt.Sprintf("停止 Ability %s: %v", activated[index], err))
+				continue
+			}
+			if err := client.WaitStopped(stopContext, identifier, opened.Manifest.ShutdownTimeout()); err != nil {
+				failures = append(failures, fmt.Sprintf("确认 Ability %s 停止: %v", identifier, err))
+			} else {
+				evidence.AbilityStopConfirmed++
+			}
 		}
 		if _, err := frameworkProcess.terminate(opened.Manifest.ShutdownTimeout(), false); err != nil {
 			failures = append(failures, err.Error())
@@ -313,7 +325,6 @@ func Run(ctx context.Context, instanceDirectory string) (runErr error) {
 		if err != nil {
 			return finishFailed(instanceDirectory, state, err)
 		}
-		defer frameworkProcess.tree.Close()
 		state.AbilityFrameworkPID = frameworkProcess.cmd.Process.Pid
 		_ = writePID(filepath.Join(instanceDirectory, "run", "ability-framework.pid"), state.AbilityFrameworkPID)
 		_ = writeState(instanceDirectory, &state)
@@ -323,7 +334,7 @@ func Run(ctx context.Context, instanceDirectory string) (runErr error) {
 		return finishFailed(instanceDirectory, state, err)
 	}
 	for _, ability := range opened.Manifest.Spec.Artifacts.Abilities {
-		if err := client.EnsurePackage(ctx, ability.Template, opened.Path(ability.File), opened.Manifest.ReadinessTimeout()); err != nil {
+		if err := client.EnsurePackage(ctx, ability.Template, abilityPackagePath(opened, ability.File), opened.Manifest.ReadinessTimeout()); err != nil {
 			_ = shutdown()
 			return finishFailed(instanceDirectory, state, fmt.Errorf("准备 Ability %s: %w", ability.Role, err))
 		}
@@ -478,6 +489,9 @@ func runtimeEnvironment(instanceDirectory string, config Config, opened bundle.B
 		environment = setEnvironment(environment, "MODEL_REGISTRY_PATH",
 			filepath.Join(instanceDirectory, "model-registry.json"))
 	}
+	if binding, err := readComponentBindings(config.Spec.ComponentBindingsFile, config); err == nil && binding.Model != nil {
+		environment = setEnvironment(environment, "MODEL_REGISTRY_PATH", binding.Model.Config)
+	}
 	if filepath.IsAbs(python) {
 		environment = setEnvironment(environment, "PATH", filepath.Dir(python)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
@@ -526,7 +540,6 @@ func Stop(ctx context.Context, instanceDirectory string) error {
 	if err := stopport.Request(state.SupervisorPID, state.SupervisorIdentity); err != nil {
 		return err
 	}
-
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {

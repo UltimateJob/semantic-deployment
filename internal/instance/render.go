@@ -99,11 +99,23 @@ func Render(configPath, outputDirectory string) (State, error) {
 		SDKPackage:     opened.Manifest.Spec.Robot.SDKPackage,
 		SDKOptions:     mergeSDKOptions(opened.Manifest.Spec.Robot.DefaultSDKOptions, config.Spec.Robot.Options),
 	}
+	binding, err := snapshotComponentBindings(&config, outputDirectory)
+	if err != nil {
+		return State{}, err
+	}
+	data.Instance = config
 	if opened.Manifest.Spec.Templates.ModelRegistry != "" {
 		data.ModelRegistryPath = filepath.Join(outputDirectory, "model-registry.json")
 		if err := copyFile(opened.Path(opened.Manifest.Spec.Templates.ModelRegistry), data.ModelRegistryPath, 0o640); err != nil {
 			return State{}, err
 		}
+	}
+	if binding.Model != nil {
+		// 模型配置可引用同一组件内的权重，保留其绝对安装位置以维持相对引用语义。
+		if _, err := os.Stat(binding.Model.Config); err != nil {
+			return State{}, err
+		}
+		data.ModelRegistryPath = binding.Model.Config
 	}
 	if err := renderTemplate(opened.Path(opened.Manifest.Spec.Templates.RobotDeployment),
 		filepath.Join(outputDirectory, "robot-deployment.yaml"), data); err != nil {
@@ -199,6 +211,9 @@ func refreshRenderedConfiguration(config Config, outputDirectory string) error {
 		{relative: "robot-deployment.yaml", mode: 0o640},
 		{relative: "ability-framework/config.yaml", mode: 0o640},
 		{relative: "run/bundle.json", mode: 0o640},
+	}
+	if config.Spec.ComponentBindingsFile != "" {
+		files = append(files, renderedFile{relative: "run/components.json", mode: 0600})
 	}
 	if _, err := os.Stat(filepath.Join(staging, "model-registry.json")); err == nil {
 		files = append(files, renderedFile{relative: "model-registry.json", mode: 0o640})

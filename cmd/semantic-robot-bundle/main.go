@@ -42,6 +42,8 @@ func main() {
 		err = build(os.Args[2:])
 	case "inspect":
 		err = inspect(os.Args[2:])
+	case "export":
+		err = exportPackage(os.Args[2:])
 	default:
 		usage()
 	}
@@ -52,8 +54,32 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "用法: semantic-robot-bundle <build|inspect> [参数]")
+	fmt.Fprintln(os.Stderr, "用法: semantic-robot-bundle <build|inspect|export> [参数]")
 	os.Exit(2)
+}
+
+func exportPackage(arguments []string) error {
+	flags := flag.NewFlagSet("export", flag.ContinueOnError)
+	root := flags.String("bundle", "", "Robot 类型包目录")
+	output := flags.String("output", "", "可直接导入的组件 ZIP")
+	python := flags.String("python-version", "", "目标 Python 版本，与 Wheel ABI 一致")
+	var rawMappings fileMappings
+	flags.Var(&rawMappings, "file", "替换已声明的构建产物，target=source，可重复")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if *root == "" || *output == "" {
+		return fmt.Errorf("export 需要 --bundle 和 --output")
+	}
+	var mappings []bundle.FileMapping
+	for _, raw := range rawMappings {
+		mapping, err := bundle.ParseFileMapping(raw)
+		if err != nil {
+			return err
+		}
+		mappings = append(mappings, mapping)
+	}
+	return bundle.ExportPackageWithMappings(*root, *output, *python, mappings)
 }
 
 func build(arguments []string) error {

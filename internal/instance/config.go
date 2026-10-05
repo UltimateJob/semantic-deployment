@@ -46,11 +46,12 @@ type Metadata struct {
 }
 
 type Spec struct {
-	Bundle           string                 `yaml:"bundle" json:"bundle"`
-	Robot            RobotConfig            `yaml:"robot" json:"robot"`
-	AbilityFramework AbilityFrameworkConfig `yaml:"abilityFramework" json:"abilityFramework"`
-	SemanticServer   SemanticServerConfig   `yaml:"semanticServer" json:"semanticServer"`
-	Pilot            PilotConfig            `yaml:"pilot" json:"pilot"`
+	ComponentBindingsFile string                 `yaml:"componentBindingsFile,omitempty" json:"componentBindingsFile,omitempty"`
+	Bundle                string                 `yaml:"bundle" json:"bundle"`
+	Robot                 RobotConfig            `yaml:"robot" json:"robot"`
+	AbilityFramework      AbilityFrameworkConfig `yaml:"abilityFramework" json:"abilityFramework"`
+	SemanticServer        SemanticServerConfig   `yaml:"semanticServer" json:"semanticServer"`
+	Pilot                 PilotConfig            `yaml:"pilot" json:"pilot"`
 }
 
 type RobotConfig struct {
@@ -111,6 +112,9 @@ func LoadConfig(path string) (Config, error) {
 		config.Spec.Bundle = filepath.Join(filepath.Dir(path), config.Spec.Bundle)
 	}
 	config.Spec.Bundle, err = filepath.Abs(config.Spec.Bundle)
+	if config.Spec.ComponentBindingsFile != "" && !filepath.IsAbs(config.Spec.ComponentBindingsFile) {
+		config.Spec.ComponentBindingsFile = filepath.Join(filepath.Dir(path), config.Spec.ComponentBindingsFile)
+	}
 	return config, err
 }
 
@@ -182,11 +186,15 @@ func (config *Config) Validate() error {
 		if strings.TrimSpace(config.Spec.Robot.SceneInstanceID) == "" {
 			return errors.New("MuJoCo 实例必须配置 spec.robot.sceneInstanceId")
 		}
-		if len(config.Spec.Robot.Tools) == 0 {
-			return errors.New("MuJoCo 实例必须携带 Runtime Robot Profile 的工具描述")
-		}
-		if strings.TrimSpace(config.Spec.Robot.URDFPath) == "" {
-			return errors.New("R1 Pro MuJoCo 本地 IK 必须配置 spec.robot.urdfPath")
+		// 工具清单和本地 IK 的 URDF 是 R1 Pro 型号包的要求，不是 MuJoCo
+		// 引擎的通用要求。Franka/LIBERO 使用原生 OSC 控制器和内置双指夹爪。
+		if config.Spec.Robot.Model == "r1_pro_chassis" {
+			if len(config.Spec.Robot.Tools) == 0 {
+				return errors.New("R1 Pro MuJoCo 实例必须携带 Runtime Robot Profile 的工具描述")
+			}
+			if strings.TrimSpace(config.Spec.Robot.URDFPath) == "" {
+				return errors.New("R1 Pro MuJoCo 本地 IK 必须配置 spec.robot.urdfPath")
+			}
 		}
 	}
 	if config.Spec.Robot.Options == nil {

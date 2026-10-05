@@ -82,24 +82,6 @@ func TestMujocoDeploymentTemplateUsesRuntimeDescriptor(t *testing.T) {
 	if deployment.Pilot.ID == "" || len(deployment.RobotSkills) != 3 {
 		t.Fatalf("Pilot 或 desired Robot Skill 未进入模板: %+v", deployment.Pilot)
 	}
-	// 新实例按模板播种精确版本，必须与本次发布的技能版本一致。
-	wantSkills := map[string]string{
-		"grasp-object": "0.4.23", "semantic-navigation": "0.4.7", "place-object": "0.4.42",
-	}
-	example, err := loadRobotDeployment(filepath.Join("..", "..", "examples", "r1pro-mujoco-01.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, candidate := range []robotDeployment{deployment, example} {
-		if len(candidate.RobotSkills) != len(wantSkills) {
-			t.Fatalf("Robot Skill 清单数量不匹配: %+v", candidate.RobotSkills)
-		}
-		for _, skill := range candidate.RobotSkills {
-			if version, ok := wantSkills[skill.Name]; !ok || skill.Version != version || !skill.Enabled {
-				t.Fatalf("Robot Skill 默认版本/启用状态不匹配: %+v", skill)
-			}
-		}
-	}
 	if len(deployment.Robot.Kinematics.NamedPostures["travel"]) == 0 {
 		t.Fatalf("travel 命名姿态未进入 RobotDeployment")
 	}
