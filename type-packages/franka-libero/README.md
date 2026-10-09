@@ -1,32 +1,42 @@
-# LIBERO / Franka 独立部署
+# LIBERO / Franka standalone deployment
 
-此型号包仅启动 `FrankaVLA.V2`，模型由 Franka Ability 的
-`configs/smolvla-libero.json` 绑定。Robot Skill `vla-manipulation` 单独发布到
-Server，再通过 desired/installed 对账安装；不复用 R1 的工具、URDF 或拆码垛 Skill。
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-## 隔离与前置制品
+This model package only starts `FrankaVLA.V2`; the model is bound by the Franka
+Ability's `configs/smolvla-libero.json`. The Robot Skill `vla-manipulation` is
+published separately to the Server and then installed via desired/installed
+reconciliation; it does not reuse the R1 tools, URDF, or depalletizing Skill.
 
-从 Semantic 主目录运行，示例安装根目录为
-`.cache/libero-behavior-vla/deployment`。原 `.output`、R1 数据库及其服务不动。
-新 Server 使用 19080/19081，Web 使用 3001，LIBERO Runtime 使用 19090，
-受管 AbilityFramework 使用 19100–19149。
+## Isolation and prerequisite artifacts
 
-以下是源码开发部署工具，不是已发布的自包含安装器。执行 `assemble` 前准备：
+Run from the Semantic home directory; the example install root is
+`.cache/libero-behavior-vla/deployment`. The original `.output`, R1 database,
+and their services are left untouched. The new Server uses 19080/19081, the Web
+uses 3001, the LIBERO Runtime uses 19090, and the managed AbilityFramework uses
+19100–19149.
 
-- `ROOT/bin/semantic-server`、`semantic`、`semantic-pilot`：当前 Framework 源码构建。
-- `ROOT/bin/semantic-robot-bundle`、`semantic-robot-instance`：当前本仓源码构建。
-- `ROOT/build/wheels`：Franka Ability `uv.lock` 锁定的 SmolVLA 完整依赖，以及
-  当前源码的 Robot SDK Core、Franka SDK、Franka Ability、Robot Skill SDK Wheel。
-- `ROOT/build/requirements.txt`：用
-  `uv export --project semantic-ability/franka-ability --frozen --no-dev --extra smolvla --no-emit-local --no-hashes`
-  导出的依赖清单；再用 `pip wheel --no-deps -r ...` 准备离线 Wheel。
-- `semantic-ability/ability-runtime` 中已有的 AbilityFramework、ability-py Wheel
-  和 `.venv/bin/ability-scaffold`。
-- LIBERO 原生资产、`profiles/libero/.venv`、Franka Ability `.venv` 以及本机模型缓存。
-  当前脚本使用 `.cache/libero-behavior-vla/LIBERO` 和该目录下的 `huggingface` 缓存，
-  模型运行时开启离线模式，不在启动中临时下载或改变模型 revision。
+The following are source development deployment tools, not a published
+self-contained installer. Prepare before running `assemble`:
 
-## 组装与启动
+- `ROOT/bin/semantic-server`, `semantic`, `semantic-pilot`: built from the
+  current Framework source.
+- `ROOT/bin/semantic-robot-bundle`, `semantic-robot-instance`: built from the
+  current source of this repository.
+- `ROOT/build/wheels`: the full SmolVLA dependencies locked by the Franka
+  Ability's `uv.lock`, plus the Robot SDK Core, Franka SDK, Franka Ability, and
+  Robot Skill SDK wheels from the current source.
+- `ROOT/build/requirements.txt`: the dependency manifest exported with
+  `uv export --project semantic-ability/franka-ability --frozen --no-dev --extra smolvla --no-emit-local --no-hashes`;
+  then prepare offline wheels with `pip wheel --no-deps -r ...`.
+- The existing AbilityFramework and ability-py wheels in
+  `semantic-ability/ability-runtime`, and `.venv/bin/ability-scaffold`.
+- LIBERO native assets, `profiles/libero/.venv`, the Franka Ability `.venv`,
+  and the local model cache. The current scripts use
+  `.cache/libero-behavior-vla/LIBERO` and the `huggingface` cache under that
+  directory; offline mode is enabled at model runtime, with no ad-hoc downloads
+  or model revision changes during startup.
+
+## Assembly and startup
 
 ```bash
 export LIBERO_DEPLOY_ROOT="$PWD/.cache/libero-behavior-vla/deployment"
@@ -38,31 +48,44 @@ semantic-ability/franka-ability/.venv/bin/python \
   semantic-robot-deployment/scripts/deploy_franka_libero.py serve --root "$LIBERO_DEPLOY_ROOT"
 ```
 
-`assemble` 在构建副本中打包 Ability，保留依赖锁，并分别检查 Ability 环境和
-Skill 的离线依赖可安装性。已有同路径 Bundle 时先安全停止使用它的 Robot，
-将旧包移入备份，再构建；不覆盖正在运行的只读包。
+`assemble` packages the Ability in the build copy, preserves the dependency
+lock, and separately checks the offline installability of the Ability
+environment and the Skill's dependencies. When a Bundle already exists at the
+same path, the Robot using it is safely stopped first, the old package is moved
+into backup, and then the build proceeds; a running read-only package is never
+overwritten.
 
-另一终端在 `semantic-web` 中启动：
+In another terminal, start in `semantic-web`:
 
 ```bash
 VITE_SERVER_HTTP=http://127.0.0.1:19080 \
 VITE_SERVER_WS=ws://127.0.0.1:19081 npm run dev -- --host 0.0.0.0 --port 3001
 ```
 
-在新 Web 中配置模型服务与密钥，创建 LIBERO 项目，选择 `LIBERO Spatial · Task 0`
-及原生初态，再启动场景。发布 `ROOT/build/vla-manipulation-<源码版本>.zip`，
-确认 Robot 的安装版本与源码一致。已有 Robot 的 desired 版本不会因模板更新而
-被强制覆盖，须通过设备页或正式 Skill 安装接口选择新版本。
+In the new Web, configure the model service and key, create a LIBERO project,
+select `LIBERO Spatial · Task 0` and the native initial state, then start the
+scene. Publish `ROOT/build/vla-manipulation-<source version>.zip` and confirm
+the Robot's installed version matches the source. An existing Robot's desired
+version is not forcibly overwritten by template updates; the new version must
+be selected through the device page or the official Skill install interface.
 
-## 验收边界
+## Acceptance boundaries
 
-1. 场景运行且位姿流持续推进，不代表 Robot 已就绪；还须检查 Ability Running、
-   Pilot 在线，以及 `vla-manipulation` 安装成功且已启用。
-2. 设备页 Skill 调试可验证执行、阶段图像和原生评测，但不能代替 Agent 验收。
-3. Agent 验收须在真实对话中调用该 Skill。抓取指定物体使用 `objective=grasp`，
-   原生完整任务使用 `objective=native_task`，不能混淆两种成功标准。
-4. 模型密钥不随 Bundle、源码或构建证据复制。新 Server 未配置有效密钥时，
-   对话闭环属于未完成，不以 Mock 或独立推理结果代替。
-5. 失败执行和图像保留在独立 Server 数据目录，未通过原生目标判断不能报告任务成功。
+1. A scene running with a continuously advancing pose stream does not mean the
+   Robot is ready; you must also check that the Ability is Running, Pilot is
+   online, and `vla-manipulation` is installed successfully and enabled.
+2. Skill debugging on the device page can verify execution, stage images, and
+   native evaluation, but it cannot replace Agent acceptance.
+3. Agent acceptance must invoke the Skill in a real conversation. Grasping a
+   specified object uses `objective=grasp`; the native full task uses
+   `objective=native_task` — the two success criteria must not be conflated.
+4. Model keys are not copied with the Bundle, source, or build evidence. When
+   the new Server has no valid key configured, the conversation loop counts as
+   incomplete and must not be substituted with Mock or standalone inference
+   results.
+5. Failed executions and images are retained in the standalone Server data
+   directory; task success cannot be reported without passing the native
+   objective judgment.
 
-本型号包不包含 BEHAVIOR/R1Pro π0.5；不能据此宣称 BEHAVIOR 已部署可用。
+This model package does not include BEHAVIOR/R1Pro π0.5; it cannot be used to
+claim that BEHAVIOR is deployed and usable.
