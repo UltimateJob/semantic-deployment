@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# Copyright 2026 InsightOS
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Franka LIBERO 机器人运行支持包（robot_base）的一键重建脚本。
 
 从克隆好的工作区出发，串起 deploy_franka_libero.py assemble 之前的全部准备
@@ -32,10 +47,12 @@ WORKSPACE_DEFAULT = SCRIPT.parents[2]   # 工作区根（各仓库的父目录�
 
 
 class RefreshError(RuntimeError):
+    """Error raised when the franka-libero refresh pipeline cannot proceed."""
     pass
 
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> None:
+    """Echo and run a subprocess command, raising on non-zero exit."""
     printable = " ".join(str(c) for c in cmd)
     where = f"  (cwd={cwd})" if cwd else ""
     print(f"$ {printable}{where}", flush=True)
@@ -43,16 +60,21 @@ def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> Non
 
 
 def banner(step: str, total: int, title: str) -> None:
+    """Print a numbered ``[step/total] title`` progress banner."""
     print(f"\n===== [{step}/{total}] {title} =====", flush=True)
 
 
 def require_dir(path: Path, label: str) -> Path:
+    """Return ``path`` if it is an existing directory, else raise ``RefreshError``."""
+
     if not path.is_dir():
         raise RefreshError(f"缺少{label}: {path}（请先克隆对应仓库并切到 feature/libero-behavior-vla）")
     return path
 
 
 def require_file(path: Path, label: str, min_bytes: int = 1024) -> Path:
+    """Return ``path`` if it is a file of at least ``min_bytes``, else raise ``RefreshError``."""
+
     if not path.is_file() or path.stat().st_size < min_bytes:
         raise RefreshError(
             f"缺少{label}: {path}\n"
@@ -63,6 +85,8 @@ def require_file(path: Path, label: str, min_bytes: int = 1024) -> Path:
 
 
 def require_tool(name: str) -> str:
+    """Return the absolute path of executable ``name`` on PATH, else raise ``RefreshError``."""
+
     path = shutil.which(name)
     if not path:
         raise RefreshError(f"找不到 {name}，请先安装并加入 PATH")
@@ -189,6 +213,7 @@ def _curl_wheel_dir() -> Path:
 
 
 def main() -> int:
+    """CLI entry point: build and optionally install the franka-libero robot bundle."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--workspace", type=Path, default=WORKSPACE_DEFAULT,
                         help="工作区根目录（默认：本脚本所在仓库的上级目录）")
