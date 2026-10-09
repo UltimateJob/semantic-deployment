@@ -1,40 +1,46 @@
 # semantic-robot-deployment
 
-BEHAVIOR / cuRobo 当前部署入口：[源码部署说明](docs/curobo-main-deployment.md)、
-[精确版本锁](docs/curobo-release-lock.json)（2026-09-30，部署仓库分支 `feature/behavior-test`）。
-按锁定提交构建；不包含 Trace、录屏或机器运行配置。
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-本仓把确定版本的 Pilot、AbilityFramework、七类 Ability、Robot SDK 和 Robot
-Skill Runtime SDK 组装为 Robot 型号运行包，再为每台 Robot 创建隔离的运行目录。
+> The remote repository is named `semantic-deployment`; its local directory in quick-start is `semantic-robot-deployment/`.
 
-具体的 grasp-object、semantic-navigation 和 place-object 不进入 bundle。它们仍由
-Semantic Server 的 Robot Skill Registry 单独发布、安装和启用。plugin-mujoco
-也是独立进程；本仓只把它的 HTTP Endpoint 写入 Robot SDK 配置，不修改它。
+Current BEHAVIOR / cuRobo deployment entry: [source deployment guide](docs/curobo-main-deployment.md),
+[exact version lock](docs/curobo-release-lock.json) (2026-09-30, deployment repo branch `feature/behavior-test`).
+Build from the locked commits; Trace, screen recording, and machine run configuration are not included.
 
-### 阶段图像对应制品
+This repo assembles pinned versions of Pilot, AbilityFramework, the seven Ability types, the Robot SDK, and the Robot
+Skill Runtime SDK into a per-Robot-model runtime bundle, then creates an isolated runtime directory for each Robot.
 
-当前类型包使用 `semantic-r1pro-abilities==0.4.0.dev1`，包含 Ability/Pilot
-图片交换目录修复。MuJoCo 默认 Robot Skill 为 `grasp-object 0.4.22`、
-`semantic-navigation 0.4.7`、`place-object 0.4.42`，包含阶段 RGB 采集。
-Ability ZIP/CR 的 `0.4.0` 是能力包描述版本，不代表 Python 实现包版本。
+The concrete grasp-object, semantic-navigation, and place-object skills do not ship in the bundle. They are still
+published, installed, and enabled separately through the Semantic Server's Robot Skill Registry. plugin-mujoco
+is also a separate process; this repo only writes its HTTP endpoint into the Robot SDK configuration and does not modify it.
 
-使用 Framework 的 `scripts/refresh_v050_mujoco.py` 时，需同步更新本仓和
-R1 Pro Ability、Robot Skill 仓。刷新脚本从当前源码构建到本次暂存目录，
-检查 Ability 源码版本与本仓 Wheel 清单一致，并在激活前用 Bundle 内 Python
-核对实际安装版本。结果写入 `.output/v050-mujoco-refresh/refresh-summary.json`
-的 `ability_implementation`（版本、Wheel 文件名、SHA-256）。不复用 Ability
-仓库 `dist` 中的旧 Wheel，也不能通过只升级宿主机 Python 包更新运行中的 Bundle。
+### Stage-image artifacts
 
-`build --activate` 后仍需重启 Server 使 Catalog 生效，再运行脚本的 `publish`
-发布/安装三个 Robot Skill，最后启动 Robot Runtime。仅执行 `build` 不会激活；
-仅发布 Skill 不会更新 Bundle 内的 Ability。已有 Robot 的实际 Skill 版本以
-Server desired/installed 对账为准，更新模板不会自动覆盖用户已选择的版本。
+The current type package uses `semantic-r1pro-abilities==0.4.0.dev1`, which includes the Ability/Pilot
+image exchange directory fix. The default MuJoCo Robot Skills are `grasp-object 0.4.22`,
+`semantic-navigation 0.4.7`, and `place-object 0.4.42`, which include stage RGB capture.
+The `0.4.0` of the Ability ZIP/CR is the capability-package descriptor version, not the Python implementation package version.
 
-## 命令
+When using the Framework's `scripts/refresh_v050_mujoco.py`, update this repo and the
+R1 Pro Ability and Robot Skill repos in lockstep. The refresh script builds from current source into the current staging
+directory, checks that the Ability source version matches this repo's wheel manifest, and verifies the actually installed
+version with the bundle's Python before activation. Results are written to
+`ability_implementation` (version, wheel filename, SHA-256) in `.output/v050-mujoco-refresh/refresh-summary.json`.
+It does not reuse old wheels from the Ability repo's `dist`, and a running bundle cannot be updated by only upgrading
+host Python packages.
 
-### 标准组件交付与开发更新
+After `build --activate`, the Server still must be restarted for the Catalog to take effect; then run the script's
+`publish` to publish/install the three Robot Skills, and finally start the Robot Runtime. Running only `build` does not
+activate; only publishing Skills does not update the Abilities inside the bundle. For existing Robots, the actual Skill
+versions are reconciled against the Server's desired/installed state; updating templates does not automatically override
+versions the user has already selected.
 
-新部署使用 Framework 的 `semantic install` 或 Web 项目导入入口。首次交付底座：
+## Commands
+
+### Standard component delivery and development updates
+
+New deployments use the Framework's `semantic install` or the Web project import entry. First delivery of the base platform:
 
 ```bash
 semantic-robot-bundle export --bundle ./built/franka-libero \
@@ -42,40 +48,40 @@ semantic-robot-bundle export --bundle ./built/franka-libero \
 semantic install ./franka-robot.zip --project <项目ID>
 ```
 
-导出只复制清单声明的二进制、模板、Ability ZIP 和 Wheel，目标安装器创建 Python 环境。
-源码依赖、venv、实例凭据与运行数据留在本机。R1 Pro 原生包使用与 Wheel ABI 一致的 Python 3.13.15。
-导出已有底座时，可使用 `--file bin/semantic-robot-instance=<当前构建产物>` 更新实例启动器。
+The export only copies the binaries, templates, Ability ZIPs, and wheels declared in the manifest; the target installer creates the Python environment.
+Source dependencies, the venv, instance credentials, and runtime data stay on the local machine. The R1 Pro native package uses Python 3.13.15, matching the wheel ABI.
+When exporting an existing base platform, `--file bin/semantic-robot-instance=<current build artifact>` can be used to update the instance launcher.
 
-后续 Ability 使用各机器人仓库的 `semantic-source.yaml` 单独构建，模型单独安装；
-运行实例将组件绑定复制到自身 `run/components.json`，更新或回退不会改动正在执行的环境。
-应用新绑定沿用原有停止、心跳、就绪检查。场景通过标准 Server 启动，正常操作无需 deployment 的 serve 脚本。
-完整流程见 Framework `docs/project-import.md`。下面的 build 说明保留供底座构建及已有环境维护使用。
+Subsequent Abilities are built separately via each robot repo's `semantic-source.yaml`, and models are installed separately;
+a running instance copies the component bindings into its own `run/components.json`, so updates or rollbacks do not touch the executing environment.
+Applying new bindings follows the existing stop, heartbeat, and readiness checks. Scenes are started through the standard Server; normal operation does not need the deployment serve scripts.
+See the Framework's `docs/project-import.md` for the full flow. The build instructions below are retained for base-platform builds and maintenance of existing environments.
 
-- semantic-robot-bundle build/inspect：组装并检查共享只读 bundle。
-- semantic-robot-instance start：使用 RobotDeployment 首次加入或直接启动一台 Robot。
-- semantic-robot-instance render/run/status/stop：底层运维命令，正常部署不需要手工调用。
+- semantic-robot-bundle build/inspect: assemble and verify the shared read-only bundle.
+- semantic-robot-instance start: use a RobotDeployment to join for the first time or directly start a Robot.
+- semantic-robot-instance render/run/status/stop: low-level operations commands; normal deployments do not invoke them by hand.
 
-启动顺序固定为：
+The startup order is fixed:
 
 ~~~text
 AbilityFramework
-→ 上传并启动七类 Ability
-→ 按 instance ID + abilityName 确认 heartbeat
+→ upload and start the seven Ability types
+→ confirm heartbeat by instance ID + abilityName
 → semantic-pilot
 ~~~
 
-停止时先要求 Pilot 到达最近安全停止点。只有 Pilot 以 0 退出才记录
-pilot_exited_cleanly=true；随后停止本实例的七个 Ability，最后关闭本实例管理的
-AbilityFramework。Pilot 非零退出、停止超时或 Ability 停止失败会使实例进入
-failed，不会仅因进程消失而报告 stopped。
+On stop, Pilot is first asked to reach the nearest safe stop point. Only when Pilot exits with 0 is
+pilot_exited_cleanly=true recorded; then the instance's seven Abilities are stopped, and finally the AbilityFramework
+managed by this instance is shut down. A non-zero Pilot exit, a stop timeout, or an Ability stop failure moves the
+instance into failed; it never reports stopped merely because a process disappeared.
 
-## 从干净目录构建
+## Building from a clean directory
 
-先准备已经通过各自测试的 AbilityFramework、semantic-pilot、产品 Wheel、第三方
-依赖 Wheel 和七个 Ability Zip。第三方依赖版本由类型包内的
-`python-requirements.lock` 固定。Robot Skill SDK Wheel 名为
-`semantic_robot_skill_sdk-0.1.0.dev0-py3-none-any.whl`，只含 SDK/Runtime，不含
-三个具体 Robot Skill。
+First prepare AbilityFramework, semantic-pilot, product wheels, third-party dependency wheels, and the seven Ability
+ZIPs that have each passed their own tests. Third-party dependency versions are pinned by
+`python-requirements.lock` inside the type package. The Robot Skill SDK wheel is named
+`semantic_robot_skill_sdk-0.1.0.dev0-py3-none-any.whl` and contains only the SDK/Runtime, not
+the three concrete Robot Skills.
 
 ~~~bash
 git clone <semantic-robot-deployment-url>
@@ -110,25 +116,25 @@ python -m pip download \
   --bundle /opt/semantic/bundles/r1pro-fake-0.5.0
 ~~~
 
-`build`只消费已构建的 Wheel、Zip 和二进制。`--wheel-dir`只按`bundle.yaml`
-声明的精确文件名补齐来源，不会把目录中的其他包带入类型包。构建器创建隔离的
-`python/venv`，使用`--no-index --no-deps`安装清单 Wheel，然后把整个 bundle
-改为只读。不同 Robot 共用这一 Python 环境，不在实例目录重复安装依赖；运行时
-同时清空宿主`PYTHONPATH`并禁用用户 site-packages。
+`build` only consumes already-built wheels, ZIPs, and binaries. `--wheel-dir` only supplies sources by the exact
+filenames declared in `bundle.yaml`; it does not pull other packages from the directory into the type package. The builder creates an isolated
+`python/venv`, installs the manifest wheels with `--no-index --no-deps`, and then makes the whole bundle
+read-only. Different Robots share this Python environment instead of reinstalling dependencies in each instance directory; at runtime
+the host `PYTHONPATH` is also cleared and user site-packages are disabled.
 
-### MuJoCo 的离线规划与 WebSocket 依赖
+### Offline planning and WebSocket dependencies for MuJoCo
 
-Fake类型包不使用传感器WebSocket，因此不携带`websockets`。MuJoCo类型包还
-声明 WebSocket、Pinocchio、Ruckig 及其传递依赖。构建 MuJoCo bundle 时，把
-source、output和requirements lock改为`r1pro-mujoco`；其余命令不变。
+The Fake type package does not use the sensor WebSocket and therefore does not carry `websockets`. The MuJoCo type package additionally
+declares WebSocket, Pinocchio, Ruckig, and their transitive dependencies. When building the MuJoCo bundle, change the
+source, output, and requirements lock to `r1pro-mujoco`; the rest of the commands are unchanged.
 
-所有 Wheel 必须预先放入离线制品目录。构建器在创建共享 Python 环境前检查全部
-清单输入；缺少制品时立即失败，不生成到运行期才因`ModuleNotFoundError`退出的
-bundle。
+All wheels must be placed in the offline artifact directory in advance. The builder checks all
+manifest inputs before creating the shared Python environment; if an artifact is missing it fails immediately, rather than
+producing a bundle that only exits with `ModuleNotFoundError` at runtime.
 
-## 一条命令加入并启动
+## Join and start with one command
 
-设备中心点击“添加 Pilot”取得一次性加入码后，使用类型包中的启动器。RobotDeployment 是用户唯一需要按设备维护的配置；完整 Fake 示例见 `examples/robot-deployment-r1pro-fake-02.yaml`。
+After clicking "Add Pilot" in the Device Center to obtain a one-time join code, use the launcher from the type package. RobotDeployment is the only per-device configuration the user needs to maintain; see `examples/robot-deployment-r1pro-fake-02.yaml` for a complete Fake example.
 
 ~~~bash
 export BUNDLE=/opt/semantic/bundles/r1pro-fake-0.5.0
@@ -138,49 +144,49 @@ export BUNDLE=/opt/semantic/bundles/r1pro-fake-0.5.0
   --join-code ABCD12
 ~~~
 
-启动器默认通过 `_semantic-server._tcp.local.` 扫描一次局域网 Server。mDNS 只发现地址；真正的设备身份由 join code 换取的专用 Pilot credential 建立。局域网无法使用 mDNS 时显式传入：
+By default the launcher scans the LAN once for a Server via `_semantic-server._tcp.local.`. mDNS only discovers the address; the real device identity is established by the dedicated Pilot credential exchanged for the join code. When mDNS is not usable on the LAN, pass explicitly:
 
 ~~~bash
   --server-http http://127.0.0.1:8080 \
   --server-ws ws://127.0.0.1:8081/ws/pilot
 ~~~
 
-首次成功后，`connection.yaml` 已保存专用 credential。以后无需 join code：
+After the first success, `connection.yaml` has saved the dedicated credential. No join code is needed later:
 
 ~~~bash
 "$BUNDLE/bin/semantic-robot-instance" start \
   --config examples/robot-deployment-r1pro-fake-02.yaml
 ~~~
 
-未指定 `--data-dir` 时，实例数据默认写入
-`$XDG_STATE_HOME/semantic/robots/<robot-id>`；未设置 XDG 时使用用户的
-`~/.local/state/semantic/robots/<robot-id>`。需要由 systemd 或容器指定持久卷时再
-显式传入 `--data-dir`。R1 Pro Fake 示例已经在 RobotDeployment 中声明首次抓取
-环境，启动后不再运行 Python 手工注入物体。
+When `--data-dir` is not specified, instance data is written to
+`$XDG_STATE_HOME/semantic/robots/<robot-id>` by default; when XDG is not set, the user's
+`~/.local/state/semantic/robots/<robot-id>` is used. Pass `--data-dir` explicitly only when systemd or a container
+needs to assign a persistent volume. The R1 Pro Fake example already declares the first-grasp
+environment in the RobotDeployment, so no manual Python object injection is run after startup.
 
-`start` 自动完成共享 bundle 定位、实例目录渲染、AbilityFramework、七类 Ability、Pilot 启动和 desired Robot Skill 对账。用户不再复制管理员 Token，也不逐个上传 Ability 或安装 Skill。
+`start` automatically handles shared bundle location, instance directory rendering, startup of AbilityFramework, the seven Ability types, and Pilot, and reconciliation of desired Robot Skills. Users no longer copy admin tokens, upload Abilities one by one, or install Skills manually.
 
-## 不连接 Server 的 Robot Skill 本地调试
+## Local Robot Skill debugging without a Server connection
 
-开发者需要隔离观察 `Robot Skill → AbilityFramework → Ability → Robot SDK`
-时，可以复用已经 render 的实例目录，只启动 AF和七类 Ability：
+When a developer needs to observe `Robot Skill → AbilityFramework → Ability → Robot SDK`
+in isolation, they can reuse an already rendered instance directory and start only AF and the seven Ability types:
 
 ```bash
 bin/semantic-robot-instance debug-stack \
   --instance /var/lib/semantic/robots/r1pro-mujoco-01
 ```
 
-该命令不启动 Pilot常驻进程、不连接Semantic Server，也不读取 Pilot credential。
-它与完整 `run` 共用 `instance.lock`，因此启动前必须先安全停止同一实例。看到
-`status: ready` 后，在另一个终端使用 `semantic-pilot skill run` 执行具体 Skill；
-必须先结束或安全停止 Skill，再退出 `debug-stack`。
+This command does not start the Pilot resident process, does not connect to the Semantic Server, and does not read the Pilot credential.
+It shares `instance.lock` with the full `run`, so the same instance must be safely stopped first. After seeing
+`status: ready`, use `semantic-pilot skill run` in another terminal to execute a specific Skill;
+the Skill must be finished or safely stopped before exiting `debug-stack`.
 
-这是开发调试入口，不替代生产 `start/run`，也不创建 Project、Workflow、Task或
-Server Robot Execution。
+This is a development debugging entry; it does not replace production `start/run`, and it does not create Projects, Workflows, Tasks, or
+Server Robot Executions.
 
-## 底层 Render、Run、Status、Stop
+## Low-level render, run, status, stop
 
-先修改 examples/r1pro-fake-01.yaml 中的 bundle、Server 地址和 token：
+First edit the bundle, Server address, and token in examples/r1pro-fake-01.yaml:
 
 ~~~bash
 export BUNDLE=/opt/semantic/bundles/r1pro-fake-0.5.0
@@ -200,12 +206,12 @@ export BUNDLE=/opt/semantic/bundles/r1pro-fake-0.5.0
   --timeout 30s
 ~~~
 
-run 是前台 supervisor，生产环境应由 systemd 或容器运行器托管。stop 给
-supervisor 发停止请求并等待停止证据，不会绕过 Pilot 直接杀 Robot 进程。
+`run` is a foreground supervisor; production environments should be managed by systemd or a container runner. `stop` sends a stop request to the
+supervisor and waits for stop evidence; it does not bypass Pilot and kill Robot processes directly.
 
-## 目录
+## Directory layout
 
-共享只读 bundle：
+The shared read-only bundle:
 
 ~~~text
 r1pro-fake-0.5.0/
@@ -217,7 +223,7 @@ r1pro-fake-0.5.0/
 └── python/venv/
 ~~~
 
-每台 Robot 的可写实例（`connection.yaml` 由首次加入生成，权限为 0600）：
+The writable per-Robot instance (`connection.yaml` is generated by the first join, with mode 0600):
 
 ~~~text
 r1pro-fake-01/
@@ -241,13 +247,13 @@ r1pro-fake-01/
 └── run/
 ~~~
 
-AbilityFramework 的数据库、CR、包、日志和 Ability 执行数据，以及 Pilot 的 DB、
-Artifact、Skill 和日志都属于当前 Robot 实例。共享 bundle 不保存运行状态。
+The AbilityFramework databases, CRs, packages, logs, and Ability execution data, as well as Pilot's DB,
+artifacts, Skills, and logs, all belong to the current Robot instance. The shared bundle holds no runtime state.
 
-## 两台 Fake Robot
+## Two Fake Robots
 
-两个实例复用同一个 bundle，但使用不同 robot.id、pilot.id、AbilityFramework
-Endpoint 和实例目录：
+Two instances reuse the same bundle but use different robot.id, pilot.id, AbilityFramework
+endpoints, and instance directories:
 
 ~~~bash
 "$BUNDLE/bin/semantic-robot-instance" render \
@@ -259,22 +265,22 @@ Endpoint 和实例目录：
   --output /var/lib/semantic/robots/r1pro-fake-02
 ~~~
 
-在两个终端分别执行 run。停止 Robot A 不会停止或删除 Robot B 的 Ability、DB、
-Artifact 或日志。
+Run `run` in two separate terminals. Stopping Robot A does not stop or delete Robot B's Abilities, DB,
+artifacts, or logs.
 
-## 两台 MuJoCo Robot 使用同一 SDK Endpoint
+## Two MuJoCo Robots sharing one SDK endpoint
 
-MuJoCo Runtime 可以在同一 Endpoint 暴露多个 Robot。两个 RobotInstance 可以使用
-相同 sdkEndpoint，但 robot.id 必须不同；Robot SDK 会把 ID 带到底层请求。每台
-Robot 仍使用不同的 Pilot ID、AbilityFramework Endpoint 和实例目录：
+The MuJoCo Runtime can expose multiple Robots on the same endpoint. Two RobotInstances may use the
+same sdkEndpoint, but robot.id must differ; the Robot SDK carries the ID into the underlying requests. Each
+Robot still uses a different Pilot ID, AbilityFramework endpoint, and instance directory:
 
 ~~~text
 Robot A: robot.id=r1pro-001, AF=http://127.0.0.1:18081
 Robot B: robot.id=r1pro-002, AF=http://127.0.0.1:18082
-共同 SDK Endpoint: http://127.0.0.1:18090
+Shared SDK endpoint: http://127.0.0.1:18090
 ~~~
 
-原生 MuJoCo 周转箱场景使用：
+The native MuJoCo tote scene uses:
 
 ~~~text
 model: r1_pro_chassis
@@ -282,11 +288,76 @@ backend: mujoco
 backendProfile: r1pro-tote-mujoco-v1
 ~~~
 
-每个实例还必须携带 Runtime 返回的 `scene_instance_id`、左右
-`component://tool/left` / `component://tool/right` 工具描述以及 R1 Pro
-URDF。完整手工诊断示例见 `examples/r1pro-mujoco-01.yaml`。正常产品流程由
-Semantic Framework 在场景启动后渲染这些字段、内部签发 Pilot credential 并调用
-bundle 启动器；用户不需要加入码，也不需要手工启动 Ability 或安装 Robot Skill。
+Each instance must also carry the `scene_instance_id` returned by the Runtime, the left/right
+`component://tool/left` / `component://tool/right` tool descriptors, and the R1 Pro
+URDF. See `examples/r1pro-mujoco-01.yaml` for a complete manual diagnostics example. In the normal product flow, the
+Semantic Framework renders these fields after the scene starts, issues the Pilot credential internally, and invokes the
+bundle launcher; the user needs no join code and does not start Abilities or install Robot Skills by hand.
 
-backendProfile 表示 bundle 运行组合（如 r1pro-tote-mujoco-v1），用于匹配 bundle；
-firmwareProfile 只交给 Robot SDK 处理固件差异，两者不能混用。
+backendProfile denotes the bundle runtime combination (e.g. r1pro-tote-mujoco-v1) and is used to match the bundle;
+firmwareProfile is only passed to the Robot SDK to handle firmware differences. The two must not be mixed.
+
+## Project layout
+
+- `cmd/`: the `semantic-robot-bundle` and `semantic-robot-instance` commands.
+- `internal/bundle/`: packaging and verification.
+- `internal/instance/` · `internal/abilityframework/`: instance lifecycle and Ability hosting.
+- `type-packages/`: Fake / MuJoCo Robot type definitions.
+- `examples/`: sample inputs.
+
+## 🛠 Build and test
+
+Requires Go **1.23+** and Make.
+
+```bash
+make build
+make verify
+```
+
+The artifacts are `bin/semantic-robot-bundle` and `bin/semantic-robot-instance`. Verification covers static checks, tests, and build; it does not automatically configure a complete Robot environment.
+
+## Using the artifacts
+
+The bundle builder accepts matching versions of the AbilityFramework / Pilot binaries, Ability ZIPs, Python wheels, and a Robot type manifest. In quick-start, the Framework's refresh workflow prepares the inputs and invokes this tool; it is the recommended path for a full R1 Pro MuJoCo deployment.
+
+```bash
+bin/semantic-robot-bundle inspect --bundle /absolute/path/to/robot-bundle
+```
+
+The instance tool connects to the Server and runs the Robot, hosting related processes. Connection credentials and mutable state belong in a separate instance data directory and must not be written into the source tree or a public bundle.
+
+## FAQ
+
+- A bundle is not a Server installer, and it does not contain published Robot Skills.
+- When the Server registry lacks a required Skill version, the instance cannot reach the executable state.
+- Bundle inputs should come from the same quick-start manifest; upgrading wheels arbitrarily can break native ABI compatibility.
+- Stop the Robot before replacing an in-use bundle; validate with Fake / simulation before connecting hardware.
+- Pairing tokens and connection files are confidential; do not include them in issue reports.
+
+[Detailed CLI and bundle reference](README.reference.md) · [Robot type definitions](type-packages/)
+
+## License
+
+Copyright 2026 InsightOS. First-party code is under [Apache-2.0](LICENSE); see [NOTICE](NOTICE) and [license scope](LICENSE_SCOPE.md) for third-party components and assets.
+
+## Reproducing builds on three platforms
+
+See the [glibc, musl, and macOS build guide](README.build.md): pinned source versions, actual script entries, tool requirements, local and CI commands, artifact locations, and per-platform verification scope.
+
+## Windows ports (in progress)
+
+The instance locks of the supervisor and debug stack now go through `internal/ports/filelock`:
+Linux/macOS use `flock`, and Windows uses non-blocking `LockFileEx`.
+The [native ports CI](.github/workflows/platform-ports.yml) tests mutual exclusion between different handles and
+different processes on all three platforms, plus recovery after unlock, close, and forced process termination, including paths with Chinese characters and spaces.
+
+With Go 1.25.8 installed, on Linux, macOS, or Windows:
+
+```text
+go test ./internal/ports/... -count=1 -timeout=2m
+```
+
+The current verification scope is only the instance-lock adapter. A full Windows supervisor still needs process-tree ownership,
+graceful-stop IPC, and process-identity adaptation; there is no Windows executable release yet.
+The existing Linux/macOS start and stop-evidence flows continue to be regression-tested by `go test ./...`.
+A normal exit explicitly unlocks before closing the file; system lock cleanup after an abnormal exit may lag briefly.

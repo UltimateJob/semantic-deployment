@@ -1,30 +1,32 @@
-# cuRobo 发布整理验证（2026-09-25）
+[English](curobo-release-validation.md) | [简体中文](curobo-release-validation.zh-CN.md)
 
-## 本次代码检查
+# cuRobo release consolidation validation (2026-09-25)
 
-- Runtime 原子控制、末端精度、夹持附件：24 项通过。
-- SDK 固定碰撞球、计划复用、轨迹和规划输入：27 项通过。
-- Ability cuRobo 转发、夹爪、关节动作和导航：76 项及 16 个子测试通过。
-- Deployment 的 instance / bundle Go 包测试通过；启动器 Bash 语法检查通过。
-- BEHAVIOR Skill 实现测试与相关场景快照按用户要求移除，未将旧测试结果计为本次验收。
-- 新运行包 r1pro-behavior-atomic 0.1.26 构建成功；ZIP 的 Bundle/Wheel 引用及 Registry 安装方式已检查。
-- Runtime 源码与实际运行覆盖目录逐文件核对一致；SDK 执行源码一致，源码包版本为 0.5.6。
-- 修改文件完成 diff whitespace 与常见凭据格式扫描；运行凭据、数据库、模型权重和完整资产未提交。
+## Code checks in this round
 
-## 制品证据
+- Runtime atomic control, end-effector precision, grip attachments: 24 items passed.
+- SDK fixed collision spheres, plan reuse, trajectories, and planning inputs: 27 items passed.
+- Ability cuRobo forwarding, gripper, joint actions, and navigation: 76 items and 16 subtests passed.
+- Deployment instance / bundle Go package tests passed; launcher Bash syntax check passed.
+- BEHAVIOR Skill implementation tests and related scene snapshots were removed at the user's request; old test results were not counted toward this acceptance.
+- New runtime package r1pro-behavior-atomic 0.1.26 built successfully; the ZIP's bundle/wheel references and registry installation method were checked.
+- Runtime source and the actual runtime overlay directory were verified file by file; the SDK execution source is identical, source package version 0.5.6.
+- Modified files passed diff-whitespace and common credential-format scans; runtime credentials, databases, model weights, and full assets were not committed.
 
-新运行包 SHA256：
+## Artifact evidence
+
+New runtime package SHA256:
 `b590a65c1f9fac92a200d1983aadf9f4bca09fef55c3c326b13d25fbd6bbbbb0`
 
-构建使用不含凭据的 SAM 配置示例，部署前必须填入目标机器路径并重新构建。
-该 ZIP 保存在源部署 `.integration/curobo-release-20260925/`；未安装到现场。
-本次构建验证复用了现有构建机的依赖下载和引擎环境，尚未在空机器验证离线安装。
+The build used a credential-free SAM configuration example; target-machine paths must be filled in and the package rebuilt before deployment.
+The ZIP is kept in the source deployment's `.integration/curobo-release-20260925/`; it has not been installed on site.
+This build validation reused an existing build machine's dependency downloads and engine environment; offline installation on an empty machine has not been verified yet.
 
-## 已有物理证据
+## Existing physical evidence
 
-- 主部署易拉罐初始化、导航、抓取、恢复直立、携物导航、投放六个 Skill 曾全部完成。
-  放置返回 release_and_retreat_motion；同回合原生评测因之后 reset 未取得。
-- 新版导航实际完成到达，距离误差约 4.78 cm。
-- 观察姿态第一关节 8° 余量从失败后的暂停位置直接运动成功，四关节最大误差约 1.7e-6 rad；
-  末段第一关节力矩约 3.2 N·m。新版 Skill 已启用，初始站姿到完整任务仍需下一轮实测。
-- 本次 Git 整理未重启 Runtime、未重置场景、未启动额外物理动作，test 部署未切换。
+- On the main deployment, the six Skills — can initialization, navigation, grasping, return-to-upright, carrying navigation, and placement — were all completed at one point.
+  Placement returned release_and_retreat_motion; the same-round native evaluation was not obtained because of the later reset.
+- The new navigation actually completed arrival, with a distance error of about 4.78 cm.
+- The observation posture's first joint with an 8° margin moved directly from the paused position after the failure and succeeded, with a maximum four-joint error of about 1.7e-6 rad;
+  the final-segment first-joint torque was about 3.2 N·m. The new Skill is enabled; the path from the initial standing posture to the full task still needs the next round of on-robot testing.
+- This Git consolidation did not restart the Runtime, did not reset the scene, and did not start additional physical motions; the test deployment was not switched.
