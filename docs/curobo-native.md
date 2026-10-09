@@ -1,6 +1,6 @@
 # Native Runtime cuRobo integration
 
-当前部署版本与迁移步骤见 [cuRobo 主部署迁移](curobo-main-deployment.md)。本页保留初期接口设计，当前执行细节以迁移说明和源码为准。
+当前部署版本与迁移步骤见 [cuRobo 主部署迁移](curobo-main-deployment.zh-CN.md)。本页保留初期接口设计，当前执行细节以迁移说明和源码为准。
 
 This branch loads the SDK planner in the Semantic Runtime's native Isaac process.
 The SDK client in Ability submits the goal over the existing atomic-command HTTP API.

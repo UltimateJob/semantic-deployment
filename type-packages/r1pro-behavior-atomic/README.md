@@ -1,6 +1,6 @@
 # BEHAVIOR 原子控制运行支持
 
-该类型包连接 Semantic 管理的 Isaac Runtime，包含八类 Ability 和公共 Skill Worker SDK。六个 behavior Skill 经 Server Registry 安装。新机器部署入口见 [cuRobo 主部署迁移](../../docs/curobo-main-deployment.md)。
+该类型包连接 Semantic 管理的 Isaac Runtime，包含八类 Ability 和公共 Skill Worker SDK。六个 behavior Skill 经 Server Registry 安装。新机器部署入口见 [cuRobo 主部署迁移](../../docs/curobo-main-deployment.zh-CN.md)。
 
 构建前，从 templates/model-registry.example.json 生成本目录 templates/model-registry.json，并填写新机器 SAM Python、源码和权重路径；实际配置不提交 Git。安装后的模型配置由启动器复制并通过 MODEL_REGISTRY_PATH 注入。
 
